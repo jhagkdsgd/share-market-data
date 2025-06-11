@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { AuthForm } from './components/Auth/AuthForm';
 import { Header } from './components/Layout/Header';
 import { Sidebar } from './components/Layout/Sidebar';
 import { MobileNav } from './components/Layout/MobileNav';
@@ -8,8 +10,10 @@ import { Portfolio } from './components/Portfolio/Portfolio';
 import { GoalManager } from './components/Goals/GoalManager';
 import { AssetManager } from './components/Assets/AssetManager';
 import { Settings } from './components/Settings/Settings';
+import { Loader2 } from 'lucide-react';
 
-function App() {
+function AppContent() {
+  const { user, loading } = useAuth();
   const [activeSection, setActiveSection] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -40,6 +44,24 @@ function App() {
     }
   };
 
+  // Show loading spinner while checking auth state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 text-blue-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Loading your trading journal...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show auth form if user is not authenticated
+  if (!user) {
+    return <AuthForm />;
+  }
+
+  // Show main app if user is authenticated
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
       <Header onToggleSidebar={toggleSidebar} />
@@ -61,6 +83,14 @@ function App() {
       
       <MobileNav activeSection={activeSection} onSectionChange={setActiveSection} />
     </div>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 

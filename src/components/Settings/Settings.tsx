@@ -7,9 +7,11 @@ import {
   Bell, 
   Clock,
   Save,
-  RefreshCw
+  RefreshCw,
+  LogOut
 } from 'lucide-react';
 import { useTradingData } from '../../hooks/useTradingData';
+import { useAuth } from '../../contexts/AuthContext';
 import { formatCurrency } from '../../utils/calculations';
 
 const currencies = [
@@ -39,9 +41,10 @@ const timezones = [
 ];
 
 export function Settings() {
-  const { portfolio, setPortfolio, userSettings, setUserSettings } = useTradingData();
+  const { portfolio, setPortfolio, userSettings, setUserSettings, exportData } = useTradingData();
+  const { user, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState('capital');
-  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
 
   const [capitalSettings, setCapitalSettings] = useState({
     initialCapital: portfolio.initialCapital.toString(),
@@ -71,66 +74,103 @@ export function Settings() {
     timezone: userSettings?.tradingHours?.timezone || 'America/New_York',
   });
 
-  const handleSaveCapitalSettings = () => {
-    setPortfolio(prev => ({
-      ...prev,
-      initialCapital: parseFloat(capitalSettings.initialCapital) || prev.initialCapital,
-      currentBalance: parseFloat(capitalSettings.currentBalance) || prev.currentBalance,
-      currency: capitalSettings.currency,
-    }));
-    alert('Capital settings saved successfully!');
+  const handleSaveCapitalSettings = async () => {
+    try {
+      await setPortfolio({
+        initialCapital: parseFloat(capitalSettings.initialCapital) || portfolio.initialCapital,
+        currentBalance: parseFloat(capitalSettings.currentBalance) || portfolio.currentBalance,
+        currency: capitalSettings.currency,
+      });
+      alert('Capital settings saved successfully!');
+    } catch (error) {
+      console.error('Error saving capital settings:', error);
+      alert('Error saving settings. Please try again.');
+    }
   };
 
-  const handleSaveRiskSettings = () => {
-    setPortfolio(prev => ({
-      ...prev,
-      maxDailyLoss: parseFloat(riskSettings.maxDailyLoss) || 0,
-      maxDailyLossPercentage: parseFloat(riskSettings.maxDailyLossPercentage) || 0,
-      maxPositionSize: parseFloat(riskSettings.maxPositionSize) || 1000,
-      maxPositionSizePercentage: parseFloat(riskSettings.maxPositionSizePercentage) || 10,
-      riskRewardRatio: parseFloat(riskSettings.riskRewardRatio) || 2,
-    }));
-
-    setUserSettings(prev => ({
-      ...prev,
-      riskManagement: {
-        ...prev?.riskManagement,
+  const handleSaveRiskSettings = async () => {
+    try {
+      await setPortfolio({
         maxDailyLoss: parseFloat(riskSettings.maxDailyLoss) || 0,
         maxDailyLossPercentage: parseFloat(riskSettings.maxDailyLossPercentage) || 0,
         maxPositionSize: parseFloat(riskSettings.maxPositionSize) || 1000,
         maxPositionSizePercentage: parseFloat(riskSettings.maxPositionSizePercentage) || 10,
         riskRewardRatio: parseFloat(riskSettings.riskRewardRatio) || 2,
-        stopLossRequired: riskSettings.stopLossRequired,
-        takeProfitRequired: riskSettings.takeProfitRequired,
-      },
-    }));
-    alert('Risk management settings saved successfully!');
+      });
+
+      await setUserSettings({
+        riskManagement: {
+          ...userSettings?.riskManagement,
+          maxDailyLoss: parseFloat(riskSettings.maxDailyLoss) || 0,
+          maxDailyLossPercentage: parseFloat(riskSettings.maxDailyLossPercentage) || 0,
+          maxPositionSize: parseFloat(riskSettings.maxPositionSize) || 1000,
+          maxPositionSizePercentage: parseFloat(riskSettings.maxPositionSizePercentage) || 10,
+          riskRewardRatio: parseFloat(riskSettings.riskRewardRatio) || 2,
+          stopLossRequired: riskSettings.stopLossRequired,
+          takeProfitRequired: riskSettings.takeProfitRequired,
+        },
+      });
+      alert('Risk management settings saved successfully!');
+    } catch (error) {
+      console.error('Error saving risk settings:', error);
+      alert('Error saving settings. Please try again.');
+    }
   };
 
-  const handleSaveNotificationSettings = () => {
-    setUserSettings(prev => ({
-      ...prev,
-      notifications: notificationSettings,
-    }));
-    alert('Notification settings saved successfully!');
+  const handleSaveNotificationSettings = async () => {
+    try {
+      await setUserSettings({
+        notifications: notificationSettings,
+      });
+      alert('Notification settings saved successfully!');
+    } catch (error) {
+      console.error('Error saving notification settings:', error);
+      alert('Error saving settings. Please try again.');
+    }
   };
 
-  const handleSaveTradingHours = () => {
-    setUserSettings(prev => ({
-      ...prev,
-      tradingHours: tradingHours,
-    }));
-    alert('Trading hours saved successfully!');
+  const handleSaveTradingHours = async () => {
+    try {
+      await setUserSettings({
+        tradingHours: tradingHours,
+      });
+      alert('Trading hours saved successfully!');
+    } catch (error) {
+      console.error('Error saving trading hours:', error);
+      alert('Error saving settings. Please try again.');
+    }
   };
 
-  const handleResetAllData = () => {
-    if (showResetConfirm) {
-      // Reset all data
-      localStorage.clear();
-      window.location.reload();
+  const handleExportData = () => {
+    try {
+      const data = exportData();
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `trading-journal-backup-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      alert('Data exported successfully!');
+    } catch (error) {
+      console.error('Error exporting data:', error);
+      alert('Error exporting data. Please try again.');
+    }
+  };
+
+  const handleSignOut = async () => {
+    if (showSignOutConfirm) {
+      try {
+        await signOut();
+      } catch (error) {
+        console.error('Error signing out:', error);
+        alert('Error signing out. Please try again.');
+      }
     } else {
-      setShowResetConfirm(true);
-      setTimeout(() => setShowResetConfirm(false), 5000);
+      setShowSignOutConfirm(true);
+      setTimeout(() => setShowSignOutConfirm(false), 5000);
     }
   };
 
@@ -148,6 +188,41 @@ export function Settings() {
         <p className="mt-1 text-sm text-gray-500">
           Configure your trading journal preferences and risk management
         </p>
+      </div>
+
+      {/* User Info */}
+      <div className="bg-white shadow-sm rounded-lg border border-gray-200">
+        <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+          <h3 className="text-lg font-medium text-gray-900">Account Information</h3>
+        </div>
+        <div className="px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-900">Email: {user?.email}</p>
+              <p className="text-xs text-gray-500">Signed in with cloud storage enabled</p>
+            </div>
+            <div className="flex space-x-3">
+              <button
+                onClick={handleExportData}
+                className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+              >
+                <Save className="h-4 w-4 mr-2" />
+                Export Data
+              </button>
+              <button
+                onClick={handleSignOut}
+                className={`inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md transition-colors ${
+                  showSignOutConfirm
+                    ? 'text-white bg-red-600 hover:bg-red-700 focus:ring-red-500'
+                    : 'text-red-700 bg-red-100 hover:bg-red-200 focus:ring-red-500'
+                } focus:outline-none focus:ring-2 focus:ring-offset-2`}
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                {showSignOutConfirm ? 'Click Again to Confirm' : 'Sign Out'}
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Tab Navigation */}
@@ -471,27 +546,6 @@ export function Settings() {
           </div>
         </div>
       )}
-
-      {/* Reset Data Section */}
-      <div className="bg-red-50 border border-red-200 rounded-lg">
-        <div className="px-6 py-4">
-          <h3 className="text-lg font-medium text-red-900">Danger Zone</h3>
-          <p className="text-sm text-red-700 mb-4">
-            Reset all data including trades, portfolio, and settings. This action cannot be undone.
-          </p>
-          <button
-            onClick={handleResetAllData}
-            className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm transition-colors ${
-              showResetConfirm
-                ? 'text-white bg-red-600 hover:bg-red-700 focus:ring-red-500'
-                : 'text-red-700 bg-red-100 hover:bg-red-200 focus:ring-red-500'
-            } focus:outline-none focus:ring-2 focus:ring-offset-2`}
-          >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            {showResetConfirm ? 'Click Again to Confirm Reset' : 'Reset All Data'}
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

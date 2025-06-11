@@ -5,7 +5,7 @@ import { useTradingData } from '../../hooks/useTradingData';
 import { formatCurrency, formatPercent } from '../../utils/calculations';
 
 export function Portfolio() {
-  const { portfolio, setPortfolio } = useTradingData();
+  const { portfolio, setPortfolio, addTransaction } = useTradingData();
   const [showTransaction, setShowTransaction] = useState(false);
   const [transactionType, setTransactionType] = useState<'deposit' | 'withdrawal'>('deposit');
   const [amount, setAmount] = useState('');
@@ -19,41 +19,48 @@ export function Portfolio() {
   const totalDeposits = portfolio.deposits.reduce((sum, d) => sum + d.amount, 0);
   const totalWithdrawals = portfolio.withdrawals.reduce((sum, w) => sum + w.amount, 0);
 
-  const handleTransaction = () => {
+  const handleTransaction = async () => {
     const transactionAmount = parseFloat(amount);
     if (!transactionAmount || transactionAmount <= 0) return;
 
-    const transaction = {
-      id: crypto.randomUUID(),
-      date: new Date().toISOString().split('T')[0],
-      amount: transactionAmount,
-      type: transactionType,
-      description: description || `${transactionType} transaction`,
-    };
+    try {
+      // Add transaction to database
+      await addTransaction({
+        date: new Date().toISOString().split('T')[0],
+        amount: transactionAmount,
+        type: transactionType,
+        description: description || `${transactionType} transaction`,
+      });
 
-    const balanceChange = transactionType === 'deposit' ? transactionAmount : -transactionAmount;
+      // Update portfolio balance
+      const balanceChange = transactionType === 'deposit' ? transactionAmount : -transactionAmount;
+      await setPortfolio({
+        currentBalance: portfolio.currentBalance + balanceChange,
+      });
 
-    setPortfolio(prev => ({
-      ...prev,
-      currentBalance: prev.currentBalance + balanceChange,
-      [transactionType === 'deposit' ? 'deposits' : 'withdrawals']: [
-        ...prev[transactionType === 'deposit' ? 'deposits' : 'withdrawals'],
-        transaction
-      ]
-    }));
-
-    // Reset form
-    setAmount('');
-    setDescription('');
-    setShowTransaction(false);
+      // Reset form
+      setAmount('');
+      setDescription('');
+      setShowTransaction(false);
+      
+      alert('Transaction added successfully!');
+    } catch (error) {
+      console.error('Error adding transaction:', error);
+      alert('Error adding transaction. Please try again.');
+    }
   };
 
-  const handleRiskSettingsUpdate = () => {
-    setPortfolio(prev => ({
-      ...prev,
-      maxDailyLoss: parseFloat(maxDailyLoss) || 0,
-      maxDailyLossPercentage: parseFloat(maxDailyLossPercentage) || 0,
-    }));
+  const handleRiskSettingsUpdate = async () => {
+    try {
+      await setPortfolio({
+        maxDailyLoss: parseFloat(maxDailyLoss) || 0,
+        maxDailyLossPercentage: parseFloat(maxDailyLossPercentage) || 0,
+      });
+      alert('Risk settings updated successfully!');
+    } catch (error) {
+      console.error('Error updating risk settings:', error);
+      alert('Error updating settings. Please try again.');
+    }
   };
 
   return (
